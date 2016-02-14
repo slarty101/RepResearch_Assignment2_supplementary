@@ -1,0 +1,51 @@
+---
+title: "RepResearch Assignment 2 - supplimentary code"
+author: "Simon West"
+date: "14 February 2016"
+output: html_document
+---
+#Introduction
+#```{r setoptions, echo = TRUE}
+#opts_chunk$set(echo=TRUE, results = "asis")
+#```
+
+##Get the data
+###setup a new directoy in the working directory to import the zip data file into
+
+```{r}
+if(!file.exists("./data")){dir.create("./data")}
+```
+
+###download the zip file from url
+
+```{r}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(fileUrl, destfile ="./data/StormData.csv.bz2")
+```
+
+###capture date of download
+#dateDownloaded <- date()
+
+###printout date of download for user
+#Data downloaded on:r  dateDownloaded
+Data downloaded on: `r date()`
+
+###read the csv file from the archive into a data table
+(This will take some time...)
+```{r}
+data <- read.csv("./data/StormData.csv.bz2")
+```
+
+### An intial look at the data
+
+```{r}
+dim(data)
+
+head(data)
+
+tail(data)
+
+summary(data)
+```
+
+
