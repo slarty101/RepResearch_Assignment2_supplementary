@@ -14,6 +14,7 @@ download.file(fileUrl, destfile ="./data/StormData.csv.bz2")
 #libraries
 library(dplyr)
 library(lubridate)
+library(ggplot2)
 
 #capture date of download
 #dateDownloaded <- date()
@@ -95,10 +96,10 @@ newData <- filter(newData, FATALITIES > 0 | INJURIES > 0 |  PROPDMG > 0 | CROPDM
 # 3.2: Only interested in continental US Hawai & DC so exclude all others
 
 #try this first
-newData <- filter(newData, match(newData$STATE, state.abb))
+#newData <- filter(newData, match(newData$STATE, state.abb))
 
                   #and this if it doesn't work
-
+#cache this bit
 newData$IS_STATE <- mapply(function(st) st %in% state.abb, newData$STATE)
 newData <- newData[newData$IS_STATE==TRUE,]
 
@@ -115,6 +116,8 @@ summary(newData$CROPDMGEXP)
 #newData <- mutate(newData, PROPVALUE= paste(as.numeric(newData$PROPDMG)))
 
 #newData$PROPVALUE = newData$PROPDMG
+
+#cache this bit
 CalcCost <- function(dmg, dmg_exp) dmg * switch(toupper(dmg_exp), H=100, K=1000, M=1000000, B=1000000000, 1)
 newData$PROPCOSTS <- mapply(CalcCost, newData$PROPDMG, newData$PROPDMGEXP)
 newData$CROPCOSTS <- mapply(CalcCost, newData$CROPDMG, newData$CROPDMGEXP)
@@ -134,7 +137,48 @@ GrpEvents <- function(wEvent) {
         ifelse(grepl("volcan|landslide", wEvent), "seismic activity",
         "Other"))))))))))
         }
+#cache this bit
 newData$WEATHERGROUP <- mapply(GrpEvents, newData$EVTYPE)
+
+
+#Plots - want to plot health and cost data against weather groupings
+#Casualties
+newData$CASUALTIES <- transform(newData, CASUALTIES = (newData$FATALITIES + newData$INJURIES))
+storm_casualties <- newData %>% group_by(WEATHERGROUP) %>% summarise(sum(CASUALTIES))
+
+#Plot
+g <- ggplot(storm_casualties, aes(x=WEATHERGROUP, y=CASUALTIES))
+g <- g + geom_bar(stat = "identity") + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1))
+print(g)
+
+#costs
+newData$TOTCOST <- transform(newData, TOTCOST = (newData$PROPCOSTS + newData$CROPCOSTS))
+
+#storm_fatalities <- newData %>% group_by(WEATHERGROUP) %>% summarise(FATALITIES = sum(FATALITIES))
+#storm_injuries <- newData %>% group_by(WEATHERGROUP) %>% summarise(INJURIES = sum(INJURIES))
+
+storm_casualties <- newData %>% group_by(WEATHERGROUP) %>% summarise(sum(FATALITIES),sum(INJURIES))
+colnames(storm_casualties) <- c("WEATHERGROUP","FATALITIES","INJURIES")
+storm_casualties$WEATHERGROUP <- as.factor(storm_casualties$WEATHERGROUP)
+#scratch
+plot1 <- ggplot(hdat, aes(x=weatherCategory, y=value, fill=variable)) 
++ geom_bar(stat="identity") + coord_flip() + ggtitle("Total Casualties per Weather Type") 
++ xlab("Weather type") + ylab("# Casualties")
+
+plot1 <- ggplot(newData, aes(x=WEATHERGROUP, y=FATALITIES)) + ggtitle("Total Casualties by Weather Grouping")
+
+# 1st attempt
+g <- ggplot(storm_casualties, aes(x=WEATHERGROUP, y=INJURIES))
+g <- g + geom_bar(stat = "identity") + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1))
+print(g)
+
+# 2nd attempt
+reorder_size <- function(x) {
+        factor(x, levels = names(sort(table(storm_casualties))))
+        }
+g <- ggplot(storm_casualties, aes(reorder_size(WEATHERGROUP)))
+g <- g + geom_bar(stat = "identity")
+
 
 
 
