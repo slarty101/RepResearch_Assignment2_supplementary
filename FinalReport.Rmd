@@ -1,0 +1,85 @@
+---
+title: "Final Report"
+author: "Simon West"
+date: "14 February 2016"
+output: html_document
+---
+
+#Title
+An Analysis of the Health and Economic Effects of Storms in the US (1950 - 2011)
+
+##Synopsis
+
+
+##Data Processing
+
+###Get the data
+Set up a directory to download the data to.
+```{r}
+if(!file.exists("./data")){dir.create("./data")}
+```
+
+Download the datafile from Coursera
+```{r}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(fileUrl, destfile ="./data/StormData.csv.bz2")
+```
+
+
+###Load the data
+
+Load the datafiel to our workspace for processing
+
+```{r}
+data <- read.csv("./data/StormData.csv.bz2", header=TRUE, sep = ",")
+```
+Lets have a quick look at the dataset.
+```{r}
+str(data)
+```
+We can see that the dataset contains 902297 observations of 37 variables. We only need subset of the data for our analysis. The dataset can be reduced to the variables of interest and then we can remove rows that are not required for our analysis. The codebook from the NOOA 
+
+**Reduce the dataset to the columns of interest for our analysis.
+```{r}
+newData <- data[ ,c(2,5,7,8,23,24,25,26,27,28)]
+```
+
+
+- need to fix financial info - crop damage and property damage plus multiplier(see below)
+
+From "NATIONAL WEATHER SERVICE INSTRUCTION 10-1605
+AUGUST 17, 2007
+Operations and Services
+ Performance, NWSPD 10-16
+STORM DATA PREPARATION"
+
+"Estimates can be obtained from emergency managers, U.S. Geological Survey, U.S. Army Corps
+of Engineers, power utility companies, and newspaper articles. If the values provided are rough
+estimates, then this should be stated as such in the narrative. Estimates should be rounded to
+three significant digits, followed by an alphabetical character signifying the magnitude of the
+number, i.e., 1.55B for $1,550,000,000. Alphabetical characters used to signify magnitude
+include “K” for thousands, “M” for millions, and “B” for billions. If additional precision is
+available, it may be provided in the narrative part of the entry. When damage is due to more
+than one element of the storm, indicate, when possible, the amount of damage caused by each
+element. If the dollar amount of damage is unknown, or not available, check the “no information
+available” box.
+The Storm Data preparer should "
+
+ - query data to answer questions
+
+##Results
+
+- Identify event type of greatest health effect  
+- Identify event type of greatest economic effect
+
+##Plots
+- barplots of health and economic costs across all event   
+- Panel plot Heatmaps (states) showing health and economic costs by state 
+
+##Conclusion
+
+
+##References
+
+
+##Appendices

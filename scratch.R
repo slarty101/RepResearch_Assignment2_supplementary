@@ -129,7 +129,7 @@ GrpEvents <- function(wEvent) {
         ifelse(grepl("hail|rain|wet|precipitation", wEvent), "precipitation",
         ifelse(grepl("flood|fld", wEvent), "flood",
         ifelse(grepl("snow|winter|wintry|blizzard|sleet|cold|ice|freeze|avalanche|icy", wEvent), "winter",
-        ifelse(grepl("thunder|tstm|tornado|wind|hurricane|funnel|tropical +storm", wEvent), "storm",
+        ifelse(grepl("thunder|tstm|tornado|wind|hurricane|funnel|tropical +storm", wEvent), "wind",
         ifelse(grepl("fire", wEvent), "fire",
         ifelse(grepl("fog|visibility|dark|dust", wEvent), "visibility",
         ifelse(grepl("surf|surge|tide|tsunami|current|seiche", wEvent), "tidal",
@@ -143,16 +143,50 @@ newData$WEATHERGROUP <- mapply(GrpEvents, newData$EVTYPE)
 
 #Plots - want to plot health and cost data against weather groupings
 #Casualties
-newData$CASUALTIES <- transform(newData, CASUALTIES = (newData$FATALITIES + newData$INJURIES))
-storm_casualties <- newData %>% group_by(WEATHERGROUP) %>% summarise(sum(CASUALTIES))
+#newData$CASUALTIES <- transform(newData, CASUALTIES = (newData$FATALITIES + newData$INJURIES))
+#newData2 <- newData
+newData2$WEATHERGROUP <- as.factor(newData2$WEATHERGROUP)
+newData3 <- mutate(newData2, CASUALTIES = (FATALITIES + INJURIES))
+storm_casualties <- newData3 %>% group_by(WEATHERGROUP) %>% summarise(CASUALTIES=sum(CASUALTIES))
+
+#take 2
+#storm_casualties <- newData[, c()]
+#storm_casualties <- aggregate(.~WEATHERGROUP, data = newData, FUN = sum)
+#storm_casualties <- newData %>% group_by(WEATHERGROUP) %>% summarise(sum(CASUALTIES))
+#^ disnae work - crashes R
 
 #Plot
 g <- ggplot(storm_casualties, aes(x=WEATHERGROUP, y=CASUALTIES))
 g <- g + geom_bar(stat = "identity") + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1))
 print(g)
+#Plot take x
+storm_casualties$WEATHERGROUP <- reorder(storm_casualties$WEATHERGROUP, desc(storm_casualties$CASUALTIES))
+g <- ggplot(storm_casualties, aes(x=WEATHERGROUP, y=CASUALTIES/1000)) + ggtitle("Total Casualties by Weather Grouping")
+g <- g + geom_bar(stat = "identity") + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1))
+g <- g + geom_bar(aes(x=WEATHERGROUP), data=storm_casualties, stat="identity" , fill = heat.colors(11))
+g <- g + xlab("Weather Grouping") + ylab("Total Casualties (1000s)")
+print(g)
+
+
 
 #costs
-newData$TOTCOST <- transform(newData, TOTCOST = (newData$PROPCOSTS + newData$CROPCOSTS))
+#newData2$WEATHERGROUP <- as.factor(newData2$WEATHERGROUP)
+newData3 <- mutate(newData2, TOTCOSTS = (PROPCOSTS + CROPCOSTS))
+storm_costs <- newData3 %>% group_by(WEATHERGROUP) %>% summarise(TOTCOSTS=sum(TOTCOSTS))
+
+#storm_costs <- arrange(storm_costs,desc(TOTCOSTS))
+storm_costs$WEATHERGROUP <- reorder(storm_costs$WEATHERGROUP, desc(storm_costs$TOTCOSTS))
+
+#g + geom_bar(aes(x=WEATHERGROUP), data=storm_costs, stat="identity")
+g <- ggplot(storm_costs, aes(x=WEATHERGROUP, y=TOTCOSTS/1000000000)) + ggtitle("Total Costs by Weather Grouping")
+g <- g + geom_bar(stat = "identity") + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1))
+g <- g + geom_bar(aes(x=WEATHERGROUP), data=storm_costs, stat="identity", fill = heat.colors(11))
+g <- g + xlab("Weather Grouping") + ylab("Total Damage Costs (US$B)")
+print(g)
+#g <- ggplot(storm_costs, aes(x=reorder(WEATHERGROUP, WEATHERGROUP, function(x) -length(x))  y=TOTCOSTS))
+#g <- g + geom_bar(stat = "identity") + theme_bw() + theme(axis.text.x = element_text(angle=90, hjust=1))
+#print(g)
+#newData$TOTCOST <- transform(newData, TOTCOST = (newData$PROPCOSTS + newData$CROPCOSTS))
 
 #storm_fatalities <- newData %>% group_by(WEATHERGROUP) %>% summarise(FATALITIES = sum(FATALITIES))
 #storm_injuries <- newData %>% group_by(WEATHERGROUP) %>% summarise(INJURIES = sum(INJURIES))
