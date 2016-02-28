@@ -1,0 +1,181 @@
+---
+title: "Reproducible Research Assignment 2 - Supplimentary Analysis"
+author: "Simon West"
+date: "14 February 2016"
+output: html_document
+---
+#An Analysis of the Health and Economic Effects of Storms in the US (1950 - 2011)
+
+##Synopsis
+  The [National Oceanic & Atmospheric Administration (NOAA)][1] Weather Service Storm data. This report undertakes analyses some supplimentary analysis and answers the two questions; Which states suffer the most  casualities due to storm events? & Which states suffer the greatest economic consequences due to storm events? From this supplimentary analysis it can be seen that Texas has suffered the most casualties related to storm events and that California and Louisana have suffered the greatest economic consequenses due to storm events.
+
+##Data Processing
+
+###Get the data
+
+Set up a directory to download the data to.
+```{r create download directory}
+if(!file.exists("./data")){dir.create("./data")}
+```
+
+Download the datafile from Coursera
+```{r download datafile, cache=TRUE}
+fileUrl <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2"
+download.file(fileUrl, destfile ="./data/StormData.csv.bz2")
+```
+
+
+###Load the data
+Load the required libraries for processing the data.
+```{r load libraries, results="hide", messsage=FALSE, warning=FALSE}
+library(lubridate)
+library(dplyr,warn.conflicts = FALSE, quietly=TRUE)
+library(ggplot2)
+library(choroplethr)
+library(xtable)
+```
+
+Load the datafile to our workspace for processing.
+
+```{r Load Data, cache=TRUE}
+data <- read.csv("./data/StormData.csv.bz2", header=TRUE, sep = ",")
+```
+Lets have a quick look at the dataset.
+```{r Check the data}
+dim(data)
+
+str(data)
+```
+We can see that the dataset contains 902297 observations of 37 variables. We only need a  subset of this data for our analysis. The dataset can be reduced to the variables of interest and then we can remove rows that are not required for our analysis. From the codebook for the data supplied by [NOAA] [2] we can see that the data relating to health is stored in 2 variables FATALITIES & INJURIES. The economic data is stored in 4 variables PROPDMG, PROPDMGEXP, CROPDMG & CROPDMGEXP.
+
+##Process the data  
+
+**Reduce the dataset to the columns of interest for our analysis.**
+```{r Start subsetting the data}
+newData <- data[ ,c(2,5,7,8,23,24,25,26,27,28)]
+```
+
+Fix the dates with lubridate
+```{r Fix the dates}
+newData$BGN_DATE <- mdy_hms(newData$BGN_DATE)
+```
+
+**Only interested in non zero health and economics data**
+
+```{r Remove zero values}
+newData <- filter(newData, FATALITIES > 0 | INJURIES > 0 |  PROPDMG > 0 | CROPDMG > 0)
+```
+**Economic Data Processing**  
+The financial info - crop damage and property damage are stored as a numerical value in PROPDMG & CROPDMG variables with an exponential in the PROPDMGEXP & CROPDMGEXP variables. The exponential values are coded (B = Billion, M = Million, K = Thousand & H = Hundred). To get the $ costs we need to mutliply the numeric value by the decoded exponential however there are some data quality issues.
+
+```{r summary info for PROPDMGEXP & CROPDMGEXP}
+summary(newData$PROPDMGEXP)
+
+summary(newData$CROPDMGEXP)
+```
+Ignoring case, we can see that there are 246 PROPDMGEXP results and 23 CROPDMGEXP results that don't fit the descriptors B, M, K or H. These results are a very small proportion of the overall dataset and will be ignored for our analysis.  
+
+We can now decode the exponential varaibles and multiply the numeric PROPDMG & CROPDMG putting the output in 2 new variables PROPCOSTS & CROPCOSTS.   
+
+```{r Decode the exponentials, cache=TRUE}
+CalcCost <- function(dmg, dmg_exp) dmg * switch(toupper(dmg_exp), H=100, K=1000, M=1000000, B=1000000000, 1)
+
+newData$PROPCOSTS <- mapply(CalcCost, newData$PROPDMG, newData$PROPDMGEXP)
+newData$CROPCOSTS <- mapply(CalcCost, newData$CROPDMG, newData$CROPDMGEXP)
+```
+
+**Geographic Data processing**  
+The dataset contains records for storm events for the continental USA, Alaska, Hawaii and overseas territories and dependancies. We want to restrict our analysis to just the continental US, Alaska & Hawaii as the choroplethr library can only map these states. 
+
+```{r remove overseas territories, cache=TRUE}
+newData$IS_STATE <- mapply(function(st) st %in% state.abb, newData$STATE)
+newData <- newData[newData$IS_STATE==TRUE,]
+```
+Now we need to add in the state name for choroplethr to map.  
+
+```{r add state name for choroplethr processing, cache=TRUE}
+newData$STATENAME <- state.name[match(newData$STATE,state.abb)]
+```
+
+**Weather Event Grouping**  
+The original dataset has 985 levels in the EVTYPE variable. This is too many to comfortably work with so we have grouped them into 11 groupings (fire, flood, heat, lightning, precipitation, seismic activity, tidal, visibility, wind, winter & Other). These are then stored in a new variable WEATHERGROUP. 
+
+```{r weather grouping, cache=TRUE, echo="FALSE"}
+GrpEvents <- function(wEvent) {
+  wEvent <- tolower(wEvent)
+        ifelse(grepl("lightning", wEvent), "lightning",
+        ifelse(grepl("hail|rain|wet|precipitation", wEvent), "precipitation",
+        ifelse(grepl("flood|fld", wEvent), "flood",
+        ifelse(grepl("snow|winter|wintry|blizzard|sleet|cold|ice|freeze|avalanche|icy", wEvent), "winter",
+        ifelse(grepl("thunder|tstm|tornado|wind|hurricane|funnel|tropical +storm", wEvent), "wind",
+        ifelse(grepl("fire", wEvent), "fire",
+        ifelse(grepl("fog|visibility|dark|dust", wEvent), "visibility",
+        ifelse(grepl("surf|surge|tide|tsunami|current|seiche", wEvent), "tidal",
+        ifelse(grepl("heat|high +temp|record +temp|warm|dry|drought", wEvent), "heat",
+        ifelse(grepl("volcan|landslide", wEvent), "seismic activity",
+        "Other"))))))))))
+}
+
+newData$WEATHERGROUP <- mapply(GrpEvents, newData$EVTYPE)
+```
+
+##Results  
+
+**Which states suffer the most  casualities due to storm events?**
+
+```{r calc casualties, cache=TRUE}
+newData <- mutate(newData, CASUALTIES = (FATALITIES + INJURIES))
+
+```
+```{r map of casualties}
+state_casualties <- newData %>% group_by(tolower(STATENAME)) %>% summarise(CASUALTIES=sum(CASUALTIES))
+colnames(state_casualties) <- c("region", "value")
+state_choropleth(state_casualties, title = "Storm Damage Casualties Across US States", legend = "Casualties")
+```  
+Now put into decsending order
+```{r sort states by casualties}
+state_casualties <- arrange(state_casualties, desc(value))
+```
+And then put in a table
+```{r xtable of casualties, results="asis"}
+xt_cas <- xtable(state_casualties[1:10,])
+print(xt_cas, type = "html")
+```
+
+  So we can see from the table that state that has suffered the most casualties from storm events is Texas.
+
+**Which types of events have the greatest economic consequences?**
+```{r calc total costs, cache=TRUE}
+newData <- mutate(newData, TOTCOST = (newData$PROPCOSTS + newData$CROPCOSTS))
+
+```
+
+```{r map of totcosts}
+state_costs <- newData %>% group_by(tolower(STATENAME)) %>% summarise(TOTCOST=sum(TOTCOST)/1000000000)
+colnames(state_costs) <- c("region", "value")
+state_choropleth(state_costs, title = "Storm Damage Costs Across US States", legend = "Economic Costs (US$B)" )
+```  
+Now put into decsending order
+```{r sort states by costs}
+state_costs <- arrange(state_costs, desc(value))
+```
+And then put in a table
+```{r xtable of costs, results="asis"}
+xt_cost <- xtable(state_costs[1:10,])
+print(xt_cost, type = "html")
+```
+  So we can see from the table that states that have suffered the most economic impact are Calirornia and Louisiana.
+
+
+##Conclusion
+From our analysis of the National Oceanic & Atmospheric Administration (NOAA) Weather Service Storm data we can see that the states sufferings the most casualties due to storm events is Texas and that the states suffering the most economic damage due to storm events are California and Louisana. 
+
+##References
+
+[1]:http://www.noaa.gov "National Oceanic & Atmospheric Administration (NOAA)"
+[2]:http://https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf "NOAA"
+
+
+
+End of report.
+
