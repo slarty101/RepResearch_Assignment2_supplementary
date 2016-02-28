@@ -217,19 +217,33 @@ g <- g + geom_bar(stat = "identity")
 
 
 #supplementary maps
-storm_health <- mutate(newData, HEALTH = (newData$FATALITIES + newData$INJURIES))
-sum_health <- storm_health %>% group_by(tolower(STATE_NAME)) %>% summarise(HEALTH=sum(HEALTH))
-colnames(sum_health) <- c("region", "value")
-state_choropleth(sum_health)
+#state_casualities <- mutate(newData, CASUALTIES = (newData$FATALITIES + newData$INJURIES))
+state_casualties <- newData %>% group_by(tolower(STATENAME)) %>% summarise(CASUALTIES=sum(CASUALTIES))
+colnames(state_casualties) <- c("region", "value")
+state_choropleth(state_casualties, title = "Storm Damage Casualties Across US States", legend = "Casualties")
 
-storm_costs <- mutate(newData, TOTCOST = (newData$PROPCOSTS + newData$CROPCOSTS))
-sum_costs <- storm_costs %>% group_by(tolower(STATE_NAME)) %>% summarise(TOTCOST=sum(TOTCOST))
-colnames(sum_costs) <- c("region", "value")
-state_choropleth(sum_costs)
+newData <- mutate(newData, TOTCOST = (newData$PROPCOSTS + newData$CROPCOSTS))
+state_costs <- newData %>% group_by(tolower(STATENAME)) %>% summarise(TOTCOST=sum(TOTCOST)/1000000000)
+#state_costs$STATENAME <- reorder(state_costs$STATENAME, desc(state_costs$TOTCOSTS))
+state_costs <- arrange(state_costs, TOTCOST)
+colnames(state_costs) <- c("region", "value")
+state_choropleth(state_costs, title = "Storm Damage Costs Across US States", legend = "Economic Costs (US$B)" )
+
+
+#xtables
+xt_cas <- xtable(state_casualties[1:10,])
+print(xt_cas, type = "html")
+
+xt_cost <- xtable(state_costs[1:10,])
+print(xt_cost, type = "html")
+
+
+
+
 
 sum_fatal <- newData %>% group_by(tolower(STATE_NAME)) %>% summarise(FATALITIES=sum(FATALITIES))
 colnames(sum_fatal) <- c("region", "value")
 state_choropleth(sum_fatal)
 
-
+state_costs$STATENAME <- reorder(state_costs$STATENAME, desc(state_costs$TOTCOSTS))
 

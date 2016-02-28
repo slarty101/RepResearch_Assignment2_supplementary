@@ -1,0 +1,6 @@
+base
+lubridate
+dplyr
+ggplot2
+choroplethr
+xtable
